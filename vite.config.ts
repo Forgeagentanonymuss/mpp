@@ -20,30 +20,6 @@ const commitTimestamp = child_process
   .toString()
   .trim();
 
-const CONTENT_SIGNAL_DIRECTIVE =
-  "Content-Signal: ai-train=no, search=yes, ai-input=no";
-
-function contentSignalsRobotsTxt(): Plugin {
-  return {
-    name: "content-signals-robots-txt",
-    enforce: "post",
-    async writeBundle(options) {
-      if (!options.dir?.endsWith("/public")) return;
-
-      const robotsPath = path.join(options.dir, "robots.txt");
-      const current = await fs.readFile(robotsPath, "utf8");
-      const next = current.includes("Content-Signal:")
-        ? current.replace(/^Content-Signal:.*$/m, CONTENT_SIGNAL_DIRECTIVE)
-        : current.replace(
-            /(User-agent: \*\nAllow: \/\n)/,
-            `$1\n${CONTENT_SIGNAL_DIRECTIVE}\n`,
-          );
-
-      if (next !== current) await fs.writeFile(robotsPath, next, "utf8");
-    },
-  };
-}
-
 function pruneSitemap(): Plugin {
   return {
     name: "prune-sitemap",
@@ -76,34 +52,16 @@ export default defineConfig(({ mode }) => {
       __COMMIT_SHA__: JSON.stringify(commitSha),
       __COMMIT_TIMESTAMP__: JSON.stringify(commitTimestamp),
     },
-    optimizeDeps: {
-      include: ["@braintree/sanitize-url", "dayjs"],
-    },
     plugins: [
       Icons({ compiler: "jsx", jsx: "react" }),
       react(),
       blogContent(),
       vocs(),
-      contentSignalsRobotsTxt(),
       pruneSitemap(),
       ...(mode !== "production" && mode !== "test"
         ? [mkcert({ force: true, hosts: ["localhost"] })]
         : []),
     ],
-    // Prevent the TypeScript compiler (used by twoslash) from being bundled into
-    // the server output. TypeScript uses `__filename` which doesn't exist in ESM.
-    environments: {
-      rsc: {
-        build: {
-          rollupOptions: {
-            external: ["typescript"],
-          },
-        },
-      },
-    },
-    ssr: {
-      external: ["typescript"],
-    },
     test: {
       exclude: [
         ...configDefaults.exclude,
